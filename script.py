@@ -470,43 +470,58 @@ class App:
     def module_playtime(self) -> None:
         if not self._require_ready():
             return
+        
+        limit_raw = input(f"  {self.console.GREY}How many games to process (max {len(self.games)}, leave blank for all) > {self.console.RESET}").strip()
+        target_games = self.games
+        if limit_raw.isdigit():
+            limit = int(limit_raw)
+            target_games = self.games[:limit]
+
         raw = input(f"  {self.console.GREY}Hours per game > {self.console.RESET}").strip()
         try:
             hours = float(raw)
         except ValueError:
             self.console.err("Invalid number entered")
             return
+        
         duration_ms = int(hours * 3600 * 1000)
         print()
-        self.console.info(f"Processing {hours:g}h across {len(self.games)} games")
+        self.console.info(f"Processing {hours:g}h across {len(target_games)} games")
         ok = Spoofer(self.client, self.console).run(
-            self.games,
+            target_games,
             lambda g: self.client.build_session(g, duration_ms),
         )
         print()
-        self.console.ok(f"Completed: {ok}/{len(self.games)} games processed")
+        self.console.ok(f"Completed: {ok}/{len(target_games)} games processed")
 
     def module_played_count(self) -> None:
         if not self._require_ready():
             return
+        
+        limit_raw = input(f"  {self.console.GREY}How many games to process (max {len(self.games)}, leave blank for all) > {self.console.RESET}").strip()
+        target_games = self.games
+        if limit_raw.isdigit():
+            limit = int(limit_raw)
+            target_games = self.games[:limit]
+
         print()
-        self.console.info(f"Registering {len(self.games)} games (1m each)")
+        self.console.info(f"Registering {len(target_games)} games (1m each)")
         ok = Spoofer(self.client, self.console).run(
-            self.games,
+            target_games,
             lambda g: self.client.build_session(g, 60 * 1000),
         )
         print()
-        self.console.ok(f"Completed: {ok}/{len(self.games)} games marked")
+        self.console.ok(f"Completed: {ok}/{len(target_games)} games marked")
 
     def menu(self) -> None:
         C = self.console
         while True:
             cookie_status = "ACTIVE" if self.state.has_cookie else "MISSING"
             print()
-            print(f"  {C.CYAN}[1]{C.RESET} Claim Playtime")
-            print(f"  {C.CYAN}[2]{C.RESET} Games Count")
-            print(f"  {C.CYAN}[3]{C.RESET} Configure Cookie [{cookie_status}]")
-            print(f"  {C.CYAN}[4]{C.RESET} Exit")
+            print(f"  {C.CYAN}1{C.RESET} Claim Playtime")
+            print(f"  {C.CYAN}2{C.RESET} Games Count")
+            print(f"  {C.CYAN}3{C.RESET} Configure Cookie [{cookie_status}]")
+            print(f"  {C.CYAN}4{C.RESET} Exit")
             print()
 
             choice = ""
