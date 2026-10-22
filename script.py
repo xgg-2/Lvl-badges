@@ -1,6 +1,12 @@
 
-import json, time, uuid, os, base64
-import urllib.request, urllib.error
+import base64
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+import uuid
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 GAMES_PATH = os.path.join(DATA_DIR, "games.json")
@@ -8,13 +14,16 @@ STATE_PATH = os.path.join(os.path.dirname(__file__), "science_state.json")
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9253 Chrome/148.0.7778.280 Electron/42.7.1 Safari/537.36"
 
 def req(url, headers=None, data=None, method="GET"):
-    r = urllib.request.Request(url, headers=headers or {}, method=method)
+    h = {"User-Agent": UA}
+    if headers:
+        h.update(headers)
+    r = urllib.request.Request(url, headers=h, method=method)
     if data:
-        r.data = json.dumps(data).encode()
+        r.data = json.dumps(data).encode("utf-8")
         r.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(r, timeout=12) as res:
-            b = res.read().decode()
+        with urllib.request.urlopen(r, timeout=15) as res:
+            b = res.read().decode("utf-8")
             return res.status, json.loads(b) if b else {}
     except urllib.error.HTTPError as e:
         return e.code, {}
@@ -22,7 +31,7 @@ def req(url, headers=None, data=None, method="GET"):
         return 0, {}
 
 def get_super_props(sig, hb):
-    _, d = req("https://cordapi.dolfi.es/api/v2/properties/windows", headers={"User-Agent": UA}, method="POST")
+    _, d = req("https://cordapi.dolfi.es/api/v2/properties/windows", method="POST")
     props = d.get("properties") or {
         "os": "Windows", "browser": "Discord Client", "release_channel": "stable",
         "client_version": "1.0.9253", "os_version": "10.0.26200", "os_arch": "x64",
@@ -32,11 +41,10 @@ def get_super_props(sig, hb):
         "client_event_source": None, "client_app_state": "focused"
     }
     props.update({"client_launch_id": str(uuid.uuid4()), "launch_signature": sig, "client_heartbeat_session_id": hb})
-    return base64.b64encode(json.dumps(props, separators=(",", ":")).encode()).decode()
+    return base64.b64encode(json.dumps(props, separators=(",", ":")).encode("utf-8")).decode("ascii")
 
 def load_games():
     if not os.path.exists(GAMES_PATH):
-        print("[-] Downloading games list...")
         os.makedirs(DATA_DIR, exist_ok=True)
         status, data = req("https://cdn.discordapp.com/detectables/games.json")
         if status != 200 or not data:
@@ -76,7 +84,7 @@ def make_events(game, ms, hb_id, sig, seq, fp=""):
     }
     
     seq += 1
-    launch = {
+    launch_props = {
         "client_track_timestamp": now, "client_heartbeat_session_id": hb_id,
         "event_sequence_number": seq, "game": game["name"], "game_id": game["id"],
         "verified": True, "elevated": False, "is_launcher": False, "game_platform": "desktop",
@@ -88,7 +96,7 @@ def make_events(game, ms, hb_id, sig, seq, fp=""):
         "client_app_state": "focused", "client_send_timestamp": now
     }
     if fp:
-        launch["executable_fingerprint"] = fp
+        launch_props["executable_fingerprint"] = fp
 
     seq += 1
     hb2 = {
@@ -102,13 +110,16 @@ def make_events(game, ms, hb_id, sig, seq, fp=""):
         }
     }
     
-    return [hb1, {"type": "launch_game", "properties": launch}, hb2], seq
+    return [hb1, {"type": "launch_game", "properties": launch_props}, hb2], seq
 
 def run(ms):
     state = {}
     if os.path.exists(STATE_PATH):
-        with open(STATE_PATH, "r", encoding="utf-8") as f:
-            state = json.load(f)
+        try:
+            with open(STATE_PATH, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            state = {}
             
     token = state.get("token") or input("Token > ").strip()
     if not token:
@@ -116,9 +127,11 @@ def run(ms):
         return
 
     if not state.get("analytics_token") or (time.time() - state.get("fetched_at", 0)) > 43200:
-        st, me = req("https://discord.com/api/v9/users/@me?with_analytics_token=true", headers={"Authorization": token, "User-Agent": UA})
+        st, me = req("https://discord.com/api/v9/users/@me?with_analytics_token=true", headers={"Authorization": token})
         if st != 200 or "analytics_token" not in me:
             print(f"[!] Auth failed ({st})")
+            if os.path.exists(STATE_PATH):
+                os.remove(STATE_PATH)
             return
         state.update({"token": token, "analytics_token": me["analytics_token"], "fetched_at": int(time.time())})
         with open(STATE_PATH, "w", encoding="utf-8") as f:
@@ -139,9 +152,13 @@ def run(ms):
     done = 0
 
     headers = {
-        "User-Agent": UA, "Authorization": token, "Accept": "*/*",
-        "Origin": "https://discord.com", "Referer": "https://discord.com/channels/@me",
-        "X-Super-Properties": super_props, "X-Discord-Locale": "en-GB", "X-Discord-Timezone": "Europe/Oslo"
+        "Authorization": token,
+        "Accept": "*/*",
+        "Origin": "https://discord.com",
+        "Referer": "https://discord.com/channels/@me",
+        "X-Super-Properties": super_props,
+        "X-Discord-Locale": "en-GB",
+        "X-Discord-Timezone": "Europe/Oslo"
     }
 
     print(f"[*] Starting for {len(target_games)} games...")
@@ -167,15 +184,26 @@ def run(ms):
 
     print(f"[+] Done ({done} games).")
 
+def main():
+    while True:
+        print("\n1. Claim Hours")
+        print("2. Mark Played (1m each)")
+        print("3. Change Token")
+        print("4. Exit")
+        
+        opt = input("> ").strip()
+        if opt == "1":
+            h = input("Hours > ").strip()
+            if h.replace('.', '', 1).isdigit():
+                run(int(float(h) * 3600 * 1000))
+        elif opt == "2":
+            run(60 * 1000)
+        elif opt == "3":
+            if os.path.exists(STATE_PATH):
+                os.remove(STATE_PATH)
+            run(60 * 1000)
+        elif opt == "4":
+            sys.exit(0)
+
 if __name__ == "__main__":
-    print("1. Claim Hours")
-    print("2. Mark Played (1m each)")
-    print("3. Exit")
-    
-    opt = input("> ").strip()
-    if opt == "1":
-        h = input("Hours > ").strip()
-        if h.replace('.', '', 1).isdigit():
-            run(int(float(h) * 3600 * 1000))
-    elif opt == "2":
-        run(60 * 1000)
+    main()
