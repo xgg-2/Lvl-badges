@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 
 from __future__ import annotations
@@ -93,7 +94,6 @@ class Console:
 @dataclass
 class State:
     token: str = ""
-    cookie: str = ""
     fingerprint: str = ""
     analytics_token: str = ""
     fetched_at: int = 0
@@ -102,7 +102,7 @@ class State:
     def load(cls) -> "State":
         if STATE_FILE.exists():
             data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-            return cls(**{k: data.get(k, v) for k, v in cls().__dict__.items()})
+            return cls(**{k: data.get(k, v) for k, v in cls().__dict__.items() if k in data or hasattr(cls, k)})
         return cls()
 
     def save(self) -> None:
@@ -111,10 +111,6 @@ class State:
     @property
     def is_stale(self) -> bool:
         return not self.analytics_token or (time.time() - self.fetched_at) > AUTH_MAX_AGE
-
-    @property
-    def has_cookie(self) -> bool:
-        return bool(self.cookie.strip())
 
     @property
     def has_token(self) -> bool:
@@ -337,7 +333,6 @@ class ScienceClient:
             "accept-language": "en-GB",
             "authorization": self.state.token,
             "content-type": "application/json",
-            "cookie": self.state.cookie,
             "origin": "https://discord.com",
             "referer": "https://discord.com/channels/@me",
             "user-agent": USER_AGENT,
@@ -438,13 +433,8 @@ class App:
             self.state.save()
             self.console.ok("Token saved")
 
-    def _refresh(self, prompt_cookie: bool) -> None:
-        if prompt_cookie:
-            entered = input(f"  {self.console.GREY}Enter Cookie (leave blank to keep current) > {self.console.RESET}").strip()
-            if entered:
-                self.state.cookie = entered
-                self.console.ok("Cookie updated")
-
+    def _refresh(self) -> None:
+        self._prompt_token()
         try:
             self.state.fetched_at = 0
             ensure_token(self.state)
@@ -455,8 +445,8 @@ class App:
         self.console.ok("Auth refreshed")
 
     def _require_ready(self) -> bool:
-        if not self.state.has_cookie:
-            self.console.err("Cookie missing. Configure via option 3.")
+        if not self.state.has_token:
+            self.console.err("Token missing.")
             return False
         if self.state.is_stale:
             try:
@@ -516,11 +506,11 @@ class App:
     def menu(self) -> None:
         C = self.console
         while True:
-            cookie_status = "ACTIVE" if self.state.has_cookie else "MISSING"
+            token_status = "SET" if self.state.has_token else "MISSING"
             print()
             print(f"  {C.CYAN}1{C.RESET} Claim Playtime")
             print(f"  {C.CYAN}2{C.RESET} Games Count")
-            print(f"  {C.CYAN}3{C.RESET} Configure Cookie [{cookie_status}]")
+            print(f"  {C.CYAN}3{C.RESET} Change Token [{token_status}]")
             print(f"  {C.CYAN}4{C.RESET} Exit")
             print()
 
@@ -533,7 +523,7 @@ class App:
             elif choice == "2":
                 self.module_played_count()
             elif choice == "3":
-                self._refresh(prompt_cookie=True)
+                self._refresh()
             elif choice == "4":
                 break
 
