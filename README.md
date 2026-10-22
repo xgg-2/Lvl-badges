@@ -83,9 +83,9 @@ Before setting up, ensure you have your **Discord Token**.
 2. Open a terminal or Command Prompt in the project folder.
 3. Run the script using Python:
    ```bash
-   python spoofer.py
+   python script.py
    ```
-   *(Or `python3 spoofer.py` on macOS/Linux)*
+   *(Or `python3 script.py` on macOS/Linux)*
 
 ---
 
@@ -112,14 +112,14 @@ git clone <YOUR_REPOSITORY_URL>
 cd <REPOSITORY_FOLDER_NAME>
 
 # Launch the script
-python spoofer.py
+python script.py
 ```
 
 ---
 
 ## How to Use
 
-When you start `spoofer.py`, you will be prompted through an interactive menu:
+When you start `scripy.py`, you will be prompted through an interactive menu:
 
 1. **Initial Setup:** Enter your Discord token when prompted. It will be stored locally in `science_state.json` for future sessions.
 2. **Main Menu Options:**
