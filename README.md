@@ -1,15 +1,15 @@
 # Max ur Badges
 
-A lightweight, efficient tool designed to simulate game activity, boost played games count, and register custom hours on your Discord profile using Discord's official Science telemetry API.
+A lightweight, efficient CLI tool designed to simulate game activity, boost played games count, and register custom hours on your Discord profile using Discord's official Science telemetry API.
 
 ---
 
 ## Features
 
-- **Playtime Booster:** Simulate playing hours for thousands of games.
-- **Game Counter:** Quickly mark thousands of games as played on your account.
-- **Cross-Platform:** Runs seamlessly on **PC (Windows, macOS, Linux)** and **Mobile (Android via Termux)**.
-- **Fast & Safe:** Uses request batching (50 games/request) and authentic client super-properties to bypass rate limits safely.
+- **Playtime Booster:** Simulate playing hours for thousands of games simultaneously.
+- **Cross-Platform:** Runs seamlessly on **PC (Windows, macOS, Linux)** and **Mobile (Android via Termux)** with mobile-friendly output width.
+- **Fast & Safe:** Uses request batching (50 games/request) and authentic client super-properties to handle telemetry safely.
+- **Minimal & Clean CLI:** Terminal UI optimized for both narrow mobile terminals and full-size desktop shells.
 
 ---
 
@@ -27,8 +27,8 @@ Before setting up, ensure you have your **Discord Token**.
 5. Paste the following script and press `Enter`:
    ```javascript
    window.webpackChunkdiscord_app.push([[Math.random()],{},e=>{for(const c of Object.values(e.c)){const t=c?.exports?.default?.getToken?.();if(typeof t==='string')return copy(t)}}]);
-   
    ```
+6. Your Discord token is now copied to your clipboard.
 </details>
 
 ---
@@ -42,9 +42,12 @@ Before setting up, ensure you have your **Discord Token**.
 - **Important (Windows):** Check the box **"Add Python to PATH"** during installation.
 
 #### 2. Run the Script
-1. Clone or download this repository.
-2. Open a terminal or Command Prompt in the project folder.
-3. Run the script using Python:
+1. Clone or download this repository:
+   ```bash
+   git clone https://github.com/xgg-2/Lvl-badges.git
+   cd Lvl-badges
+   ```
+2. Run the script using Python:
    ```bash
    python script.py
    ```
@@ -70,7 +73,7 @@ pkg install python git -y
 
 #### 3. Download & Run the Tool
 ```bash
-# Download the script (if using a git repository)
+# Clone the repository
 git clone https://github.com/xgg-2/Lvl-badges.git
 cd Lvl-badges
 
@@ -82,16 +85,19 @@ python script.py
 
 ## How to Use
 
-When you start `scripy.py`, you will be prompted through an interactive menu:
+When you start `script.py`, you will be prompted through an interactive menu:
 
-1. **Initial Setup:** Enter your Discord token when prompted. It will be stored locally in `science_state.json` for future sessions.
+1. **Initial Setup:** Enter your Discord token when prompted. It will be authenticated and stored locally in `science_state.json` for future sessions.
 2. **Main Menu Options:**
-   - **`1` Claim Playtime:** Boost specific hours across chosen games.
-     1. Enter the total number of games to target (or press `Enter` for all).
-     2. Input the hours per game (e.g., `10`, `50`, or `1.5`).
-   - **`2` Games Count:** Quickly register games (1 minute session per game) to increase your total games played stat.
+   - **`1` Start Booster:** Launch the playtime telemetry sequence.
+     - **Target Hours:** Select or input target hours per game (e.g. `100`, `1000`, `5000`, `10000`).
+     - **Batch Size:** Number of games sent per request (default: `50`).
+     - **Delay (s):** Delay between requests to avoid rate limits (default: `0.3`).
+   - **`2` View Games Database:** Browse the local detectable games database directly inside the terminal.
    - **`3` Change Token:** Update your saved Discord authentication token.
    - **`4` Exit:** Close the program safely.
+
+> **Note:** Profile badge hours and play history sync across Discord clients typically takes **~24 hours** to reflect on your public profile.
 
 ---
 
@@ -100,11 +106,11 @@ When you start `scripy.py`, you will be prompted through an interactive menu:
 | Issue | Solution |
 | :--- | :--- |
 | **`[!] Auth failed` or HTTP 401/403** | Your token is invalid or expired. Choose Option `3` in the main menu to re-enter a fresh token. |
-| **`python: command not found`** | Ensure Python is added to your system Environment Variables (`PATH`). |
-| **Request errors or 0 games processed** | Ensure your internet connection is stable. Discord endpoints may occasionally limit heavy batches if sent too fast. |
+| **`python: command not found`** | Ensure Python is added to your system Environment Variables (`PATH`). On Linux/macOS, try using `python3 script.py`. |
+| **Request errors / Non-204 Status** | Check your internet connection. Discord endpoints may occasionally respond with rate limits if batch delay is set too low. |
 
 ---
 
 ## Disclaimer
 
-> **Notice:** This project is intended strictly for educational and research purposes. Using self-bots or automated scripts on Discord accounts violates Discord's Terms of Service. Use this tool responsibly at your own risk.
+> **Notice:** This project is intended strictly for educational and research purposes. Using self-bots or automated telemetry scripts on Discord accounts violates Discord's Terms of Service. Use this tool responsibly at your own risk.
