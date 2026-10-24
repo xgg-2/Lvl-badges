@@ -1,4 +1,3 @@
-
 import base64
 import json
 import os
@@ -183,6 +182,11 @@ def run(ms):
         time.sleep(0.3)
 
     print(f"[+] Done ({done} games).")
+    print("\n" + "=" * 55)
+    print(" NOTE: Discord usually takes around 24 hours to sync")
+    print(" your badges (playtime / game count).")
+    print(" Don't panic if it doesn't show up immediately")
+    print("=" * 55 + "\n")
 
 def main():
     while True:
