@@ -26,45 +26,8 @@ Before setting up, ensure you have your **Discord Token**.
 4. Go to the **Console** tab.
 5. Paste the following script and press `Enter`:
    ```javascript
-   (() => {
-     let found = false;
-
-     window.webpackChunkdiscord_app.push([
-       [Symbol()], 
-       {}, 
-       (req) => {
-         if (found) return;
-
-         const cache = req && req.c;
-         if (!cache) return;
-
-         const module = cache[612181]?.exports;
-         const token = module?.gf?.() || module?.default?.gf?.();
-         
-         if (token) {
-           found = true;
-           console.clear();
-           console.log(`TOKEN: ${token}`);
-           
-           navigator.clipboard.writeText(token)
-             .then(() => console.log("Copied!"))
-             .catch(() => {
-               try {
-                 const dummy = document.createElement("textarea");
-                 document.body.appendChild(dummy);
-                 dummy.value = token;
-                 dummy.select();
-                 document.execCommand("copy");
-                 document.body.removeChild(dummy);
-                 console.log("Copied via fallback!");
-               } catch (err) {
-                 console.log("Copy failed, please copy manually.");
-               }
-             });
-         }
-       }
-     ]);
-   })();
+   window.webpackChunkdiscord_app.push([[Math.random()],{},e=>{for(const c of Object.values(e.c)){const t=c?.exports?.default?.getToken?.();if(typeof t==='string')return copy(t)}}]);
+   
    ```
 </details>
 
