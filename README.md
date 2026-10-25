@@ -73,7 +73,6 @@ pkg install python git -y
 
 #### 3. Download & Run the Tool
 ```bash
-# Clone the repository
 git clone https://github.com/xgg-2/Lvl-badges.git
 cd Lvl-badges
 
