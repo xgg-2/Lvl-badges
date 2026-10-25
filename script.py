@@ -20,7 +20,7 @@ try:
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
     from rich.text import Text
-    from rich.prompt import Prompt, Confirm
+    from rich.prompt import Prompt
 except ImportError:
     print("[!] Installing missing dependency 'rich'...")
     os.system(f"{sys.executable} -m pip install rich")
@@ -29,7 +29,7 @@ except ImportError:
     from rich.table import Table
     from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
     from rich.text import Text
-    from rich.prompt import Prompt, Confirm
+    from rich.prompt import Prompt
 
 ROOT = Path(__file__).resolve().parent
 GAMES_FILE = ROOT / "data" / "games.json"
@@ -54,6 +54,10 @@ console = Console()
 
 def get_term_width() -> int:
     return max(32, shutil.get_terminal_size((80, 24)).columns)
+
+
+def sanitize_input(text: str) -> str:
+    return text.encode("ascii", "ignore").decode("ascii").strip().strip('"').strip("'")
 
 
 @dataclass
@@ -115,10 +119,14 @@ def build_super_props(launch_signature: str, heartbeat_session: str) -> str:
 
 
 def read_user_info(auth_token: str) -> tuple[str, str]:
+    cleaned_token = sanitize_input(auth_token)
+    if not cleaned_token:
+        raise RuntimeError("Token contains invalid ASCII characters or is empty.")
+
     req = urllib.request.Request(
         ME_URL,
         headers={
-            "authorization": auth_token,
+            "authorization": cleaned_token,
             "user-agent": USER_AGENT,
             "accept": "*/*"
         }
@@ -126,7 +134,7 @@ def read_user_info(auth_token: str) -> tuple[str, str]:
     try:
         with urllib.request.urlopen(req, timeout=15) as response:
             data = json.loads(response.read().decode("utf-8"))
-            analytics = data.get("analytics_token") or auth_token
+            analytics = data.get("analytics_token") or cleaned_token
             user_handle = data.get("username", "Unknown")
             discriminator = data.get("discriminator", "0")
             
@@ -141,7 +149,9 @@ def read_user_info(auth_token: str) -> tuple[str, str]:
 
 
 def ensure_token(state: State, test_token: str | None = None) -> None:
-    token_to_check = (test_token if test_token is not None else state.token).strip().strip('"').strip("'")
+    raw_token = test_token if test_token is not None else state.token
+    token_to_check = sanitize_input(raw_token)
+    
     if "^[" in token_to_check:
         idx = token_to_check.rfind("m")
         if idx != -1:
@@ -149,7 +159,6 @@ def ensure_token(state: State, test_token: str | None = None) -> None:
     
     analytics, username = read_user_info(token_to_check)
     
-    # Save only after successful authentication
     state.token = token_to_check
     state.analytics_token = analytics
     state.username = username
@@ -328,7 +337,7 @@ class TerminalApp:
 
     def print_header(self) -> None:
         width = get_term_width()
-        console.print(f"[bold cyan]Max New Badges[/bold cyan]".center(width))
+        console.print(f"[bold magenta]MAX UR BADGES[/bold magenta]".center(width))
         console.print("-" * width, style="grey37")
 
     def clear(self) -> None:
@@ -336,23 +345,35 @@ class TerminalApp:
         self.print_header()
 
     def prompt_and_authenticate(self) -> bool:
-        while True:
+        try:
             token_input = Prompt.ask("[bold cyan]Enter Discord Token[/bold cyan]", password=False).strip()
-            if not token_input:
-                console.print("[red]Token cannot be empty.[/red]\n")
-                continue
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[yellow]Operation cancelled by user.[/yellow]")
+            return False
 
-            with console.status("[blue]Authenticating...[/blue]"):
-                try:
-                    ensure_token(self.state, test_token=token_input)
-                    console.print(f"[bold green]Successfully authenticated as {self.state.username}![/bold green]\n")
-                    time.sleep(1)
-                    return True
-                except Exception as e:
-                    console.print(f"[bold red]Authentication failed:[/bold red] {e}")
-                    console.print("[yellow]The token was invalid and has NOT been saved.[/yellow]\n")
-                    if not Confirm.ask("Would you like to try entering a token again?"):
-                        return False
+        clean_token = sanitize_input(token_input)
+        if not clean_token:
+            console.print("[red]Token cannot be empty or contain non-ASCII characters.[/red]")
+            return False
+
+        auth_success = False
+        error_msg = ""
+
+        with console.status("[blue]Authenticating...[/blue]"):
+            try:
+                ensure_token(self.state, test_token=clean_token)
+                auth_success = True
+            except Exception as e:
+                error_msg = str(e)
+
+        if auth_success:
+            console.print(f"[bold green]OK: Authenticated as {self.state.username}[/bold green]\n")
+            time.sleep(1)
+            return True
+        else:
+            console.print(f"[bold red]Authentication failed:[/bold red] {error_msg}")
+            console.print("[yellow]The token was invalid and has NOT been saved.[/yellow]")
+            return False
 
     def print_notice(self) -> None:
         console.print("[yellow]NOTICE:[/yellow] Hours take ~24h to update on profile.")
@@ -361,19 +382,23 @@ class TerminalApp:
         self.clear()
         
         if self.state.has_token:
+            auth_ok = False
+            err_details = ""
             with console.status("[blue]Authenticating existing token...[/blue]"):
                 try:
                     ensure_token(self.state)
+                    auth_ok = True
                 except Exception as e:
-                    console.print(f"[red]Saved token invalid:[/red] {e}")
-                    self.state.clear_file()
-                    self.state = State()
-                    if not self.prompt_and_authenticate():
-                        console.print("[red]Token required to continue. Exiting...[/red]")
-                        return
+                    err_details = str(e)
+
+            if not auth_ok:
+                console.print(f"[red]Saved token invalid:[/red] {err_details}")
+                self.state.clear_file()
+                self.state = State()
+                if not self.prompt_and_authenticate():
+                    return
         else:
             if not self.prompt_and_authenticate():
-                console.print("[red]Token required to continue. Exiting...[/red]")
                 return
 
         self.session = Session.new()
@@ -404,20 +429,27 @@ class TerminalApp:
 
         console.print(table)
         console.print(f"\n[dim]Showing 10 / {len(self.games):,} games.[/dim]\n")
-        Prompt.ask("Press Enter to return", default="")
+        try:
+            Prompt.ask("Press Enter to return", default="")
+        except (KeyboardInterrupt, EOFError):
+            pass
 
     def run_booster(self) -> None:
         self.clear()
         self.print_notice()
         console.print()
 
-        hours_str = Prompt.ask(
-            "Target Hours", 
-            choices=["100", "1000", "5000", "10000"], 
-            default="10000"
-        )
-        batch_size = int(Prompt.ask("Batch Size", default="50"))
-        batch_delay = float(Prompt.ask("Delay (s)", default="0.3"))
+        try:
+            hours_str = Prompt.ask(
+                "Target Hours", 
+                choices=["100", "1000", "5000", "10000"], 
+                default="10000"
+            )
+            batch_size = int(Prompt.ask("Batch Size", default="50"))
+            batch_delay = float(Prompt.ask("Delay (s)", default="0.3"))
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[yellow]Cancelled.[/yellow]")
+            return
 
         hours = float(hours_str)
         duration_ms = int(hours * 3600 * 1000)
@@ -462,7 +494,10 @@ class TerminalApp:
         console.print(f"Done: [green]{sent_ok:,} / {total:,} games[/green]")
         console.print(f"Target: [yellow]{hours:g} hours/game[/yellow]")
         
-        Prompt.ask("\nPress Enter to return", default="")
+        try:
+            Prompt.ask("\nPress Enter to return", default="")
+        except (KeyboardInterrupt, EOFError):
+            pass
 
     def main_menu(self) -> None:
         while True:
@@ -474,7 +509,11 @@ class TerminalApp:
             console.print("[cyan]3.[/cyan] Change Token")
             console.print("[cyan]4.[/cyan] Exit\n")
 
-            choice = Prompt.ask("Select option", choices=["1", "2", "3", "4"], default="1")
+            try:
+                choice = Prompt.ask("Select option", choices=["1", "2", "3", "4"], default="1")
+            except (KeyboardInterrupt, EOFError):
+                console.print("\nExiting...\n")
+                break
 
             if choice == "1":
                 self.run_booster()
@@ -492,7 +531,7 @@ class TerminalApp:
 def main() -> None:
     try:
         TerminalApp().start()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         console.print("\nExiting...\n")
 
 
