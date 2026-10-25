@@ -76,6 +76,13 @@ class State:
     def save(self) -> None:
         STATE_FILE.write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
 
+    def clear_file(self) -> None:
+        if STATE_FILE.exists():
+            try:
+                STATE_FILE.unlink()
+            except Exception:
+                pass
+
     @property
     def has_token(self) -> bool:
         return bool(self.token.strip())
@@ -133,14 +140,17 @@ def read_user_info(auth_token: str) -> tuple[str, str]:
         raise RuntimeError(f"Authentication failed ({exc.code}). Invalid token.") from exc
 
 
-def ensure_token(state: State) -> None:
-    state.token = state.token.strip().strip('"').strip("'")
-    if "^[" in state.token:
-        idx = state.token.rfind("m")
+def ensure_token(state: State, test_token: str | None = None) -> None:
+    token_to_check = (test_token if test_token is not None else state.token).strip().strip('"').strip("'")
+    if "^[" in token_to_check:
+        idx = token_to_check.rfind("m")
         if idx != -1:
-            state.token = state.token[idx+1:]
+            token_to_check = token_to_check[idx+1:]
     
-    analytics, username = read_user_info(state.token)
+    analytics, username = read_user_info(token_to_check)
+    
+    # Save only after successful authentication
+    state.token = token_to_check
     state.analytics_token = analytics
     state.username = username
     state.fetched_at = int(time.time())
@@ -325,11 +335,24 @@ class TerminalApp:
         console.clear()
         self.print_header()
 
-    def prompt_token(self) -> None:
-        token_input = Prompt.ask("[bold cyan]Enter Discord Token[/bold cyan]", password=True)
-        if token_input.strip():
-            self.state = State(token=token_input.strip())
-            self.state.save()
+    def prompt_and_authenticate(self) -> bool:
+        while True:
+            token_input = Prompt.ask("[bold cyan]Enter Discord Token[/bold cyan]", password=False).strip()
+            if not token_input:
+                console.print("[red]Token cannot be empty.[/red]\n")
+                continue
+
+            with console.status("[blue]Authenticating...[/blue]"):
+                try:
+                    ensure_token(self.state, test_token=token_input)
+                    console.print(f"[bold green]Successfully authenticated as {self.state.username}![/bold green]\n")
+                    time.sleep(1)
+                    return True
+                except Exception as e:
+                    console.print(f"[bold red]Authentication failed:[/bold red] {e}")
+                    console.print("[yellow]The token was invalid and has NOT been saved.[/yellow]\n")
+                    if not Confirm.ask("Would you like to try entering a token again?"):
+                        return False
 
     def print_notice(self) -> None:
         console.print("[yellow]NOTICE:[/yellow] Hours take ~24h to update on profile.")
@@ -337,21 +360,20 @@ class TerminalApp:
     def start(self) -> None:
         self.clear()
         
-        if not self.state.has_token:
-            self.prompt_token()
-
-        if not self.state.has_token:
-            console.print("[red]Token required.[/red]")
-            return
-
-        with console.status("[blue]Authenticating...[/blue]"):
-            try:
-                ensure_token(self.state)
-            except Exception as e:
-                console.print(f"[red]Auth failed:[/red] {e}")
-                if Confirm.ask("Try another token?"):
-                    self.prompt_token()
-                    self.start()
+        if self.state.has_token:
+            with console.status("[blue]Authenticating existing token...[/blue]"):
+                try:
+                    ensure_token(self.state)
+                except Exception as e:
+                    console.print(f"[red]Saved token invalid:[/red] {e}")
+                    self.state.clear_file()
+                    self.state = State()
+                    if not self.prompt_and_authenticate():
+                        console.print("[red]Token required to continue. Exiting...[/red]")
+                        return
+        else:
+            if not self.prompt_and_authenticate():
+                console.print("[red]Token required to continue. Exiting...[/red]")
                 return
 
         self.session = Session.new()
@@ -366,7 +388,6 @@ class TerminalApp:
 
     def view_games(self) -> None:
         self.clear()
-        
         
         table = Table(
             title="Games Database", 
@@ -406,7 +427,6 @@ class TerminalApp:
 
         sent_ok = 0
         
-        # mb
         progress = Progress(
             SpinnerColumn("line", style="cyan"),
             BarColumn(bar_width=12, complete_style="green", finished_style="green"),
@@ -429,7 +449,8 @@ class TerminalApp:
                     sent_ok += len(chunk)
                     progress.update(task, advance=len(chunk))
                 elif status in (401, 403):
-                    console.print("\n[red]Token invalid/expired.[/red]")
+                    console.print("\n[red]Token invalid or expired during execution.[/red]")
+                    self.state.clear_file()
                     break
                 else:
                     console.print(f"\n[yellow]Batch {request_no} returned status {status}[/yellow]")
@@ -460,16 +481,9 @@ class TerminalApp:
             elif choice == "2":
                 self.view_games()
             elif choice == "3":
-                self.prompt_token()
-                try:
-                    ensure_token(self.state)
+                if self.prompt_and_authenticate():
                     self.session = Session.new()
                     self.client = ScienceClient(self.state, self.session)
-                    console.print(f"[green]Token updated for {self.state.username}![/green]")
-                    time.sleep(1)
-                except Exception as e:
-                    console.print(f"[red]Invalid token:[/red] {e}")
-                    time.sleep(1.5)
             elif choice == "4":
                 console.print("\nExiting...\n")
                 break
