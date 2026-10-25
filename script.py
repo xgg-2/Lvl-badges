@@ -406,7 +406,7 @@ class TerminalApp:
 
         sent_ok = 0
         
-        # Mobile-friendly thin bar
+        # mb
         progress = Progress(
             SpinnerColumn("line", style="cyan"),
             BarColumn(bar_width=12, complete_style="green", finished_style="green"),
