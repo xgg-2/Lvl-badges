@@ -440,18 +440,24 @@ class TerminalApp:
         console.print()
 
         try:
-            hours_str = Prompt.ask(
-                "Target Hours", 
-                choices=["100", "1000", "5000", "10000"], 
-                default="10000"
-            )
+            # تعديل: إتاحة إدخال أي رقم بدون التقيد بمصفوفة خيارات محدودة
+            while True:
+                hours_input = Prompt.ask("Enter Target Hours (or any amount)", default="10000").strip()
+                try:
+                    hours = float(hours_input)
+                    if hours <= 0:
+                        console.print("[red]Please enter a positive number.[/red]")
+                        continue
+                    break
+                except ValueError:
+                    console.print("[red]Invalid number. Please enter a valid numerical value.[/red]")
+
             batch_size = int(Prompt.ask("Batch Size", default="50"))
             batch_delay = float(Prompt.ask("Delay (s)", default="0.3"))
         except (KeyboardInterrupt, EOFError):
             console.print("\n[yellow]Cancelled.[/yellow]")
             return
 
-        hours = float(hours_str)
         duration_ms = int(hours * 3600 * 1000)
         total = len(self.games)
 
