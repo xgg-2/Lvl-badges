@@ -440,7 +440,7 @@ class TerminalApp:
         console.print()
 
         try:
-            # تعديل: إتاحة إدخال أي رقم بدون التقيد بمصفوفة خيارات محدودة
+            
             while True:
                 hours_input = Prompt.ask("Enter Target Hours (or any amount)", default="10000").strip()
                 try:
