@@ -64,10 +64,8 @@ Before setting up, ensure you have your **Discord Token**.
 Open Termux and run the following commands line by line:
 
 ```bash
-# Update packages
 pkg update && pkg upgrade -y
 
-# Install Python and Git
 pkg install python git -y
 ```
 
