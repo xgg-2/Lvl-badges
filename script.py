@@ -1,4 +1,3 @@
-# ptry
 from __future__ import annotations
 
 import base64
@@ -441,6 +440,7 @@ class TerminalApp:
         console.print()
 
         try:
+            total_available = len(self.games)
             
             while True:
                 hours_input = Prompt.ask("Enter Target Hours (or any amount)", default="10000").strip()
@@ -453,6 +453,23 @@ class TerminalApp:
                 except ValueError:
                     console.print("[red]Invalid number. Please enter a valid numerical value.[/red]")
 
+            while True:
+                games_count_input = Prompt.ask(
+                    f"Enter Number of Games to Boost (1-{total_available:,}, or press Enter for all)", 
+                    default=str(total_available)
+                ).strip()
+                try:
+                    games_count = int(games_count_input)
+                    if games_count <= 0:
+                        console.print("[red]Please enter a number greater than 0.[/red]")
+                        continue
+                    if games_count > total_available:
+                        console.print(f"[yellow]Limiting to total available games ({total_available:,}).[/yellow]")
+                        games_count = total_available
+                    break
+                except ValueError:
+                    console.print("[red]Invalid integer number.[/red]")
+
             batch_size = int(Prompt.ask("Batch Size", default="50"))
             batch_delay = float(Prompt.ask("Delay (s)", default="0.3"))
         except (KeyboardInterrupt, EOFError):
@@ -460,7 +477,8 @@ class TerminalApp:
             return
 
         duration_ms = int(hours * 3600 * 1000)
-        total = len(self.games)
+        selected_games = self.games[:games_count]
+        total = len(selected_games)
 
         console.print(f"\n[green]Starting: {total:,} games @ {hours:g}h...[/green]\n")
 
@@ -477,7 +495,7 @@ class TerminalApp:
         with progress:
             task = progress.add_task("Syncing", total=total)
             
-            for request_no, chunk in enumerate(_chunked(self.games, batch_size), start=1):
+            for request_no, chunk in enumerate(_chunked(selected_games, batch_size), start=1):
                 events = []
                 for game in chunk:
                     events.extend(self.client.build_session(game, duration_ms))
