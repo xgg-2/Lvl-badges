@@ -74,7 +74,6 @@ pkg install python git -y
 git clone https://github.com/xgg-2/Lvl-badges.git
 cd Lvl-badges
 
-# Launch the script
 python script.py
 ```
 
